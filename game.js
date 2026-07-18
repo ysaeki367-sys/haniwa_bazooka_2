@@ -54,6 +54,7 @@ const IMG = {
   boss5: loadImage("images/boss5.png"),
   boss6: loadImage("images/boss6.png"),
   boss7: loadImage("images/boss7.png"),
+  boss8: loadImage("images/boss8.png"),
   heart: loadImage("images/heart.png"),
   gem_green: loadImage("images/gem_green.png"),
   gem_cyan: loadImage("images/gem_cyan.png"),
@@ -904,7 +905,9 @@ class Particle {
 
 class Boss {
   constructor() {
-    this.boss_type = choice([1, 2, 3, 4, 5, 6, 7]);
+    // 約1%の確率で隠しボス(OMEGA=8)が出現
+    this.boss_type = rand() < 0.01 ? 8 : choice([1, 2, 3, 4, 5, 6, 7]);
+    this.is_secret = this.boss_type === 8;
     this.dragon_shot_count = 0;
     this.slime_shot_count = 0;
 
@@ -952,13 +955,22 @@ class Boss {
       this.dash_state = "sweep";
       this.dash_timer = performance.now();
       this.base_y = 70;
-    } else {
+    } else if (this.boss_type === 7) {
       // 多頭: 複数パターン同時発射
       this.img = IMG.boss7; this.color = "rgb(120,220,120)";
       this.boss_name = "HYDRA";
       this.speed_x = 2 + (stage - 1) * 0.3;
       this.speed_y = 0;
       this.wave_angle = 0;
+    } else {
+      // OMEGA: 隠しボス（約1%出現）。回転する全方位弾幕＋テレポート
+      this.img = IMG.boss8; this.color = "rgb(255,70,70)";
+      this.boss_name = "??? OMEGA ???";
+      this.speed_x = 3 + (stage - 1) * 0.3;
+      this.speed_y = 0;
+      this.spin = 0;
+      this.bob_angle = 0;
+      this.warp_timer = performance.now();
     }
 
     this.rect = new Rect(0, 0, 100, 80);
@@ -972,6 +984,7 @@ class Boss {
     } else {
       this.max_hp = 30 + (stage - 1) * 10;
     }
+    if (this.is_secret) this.max_hp = Math.round(this.max_hp * 2.5);
     this.hp = this.max_hp;
 
     this.last_shot = performance.now();
@@ -1040,12 +1053,24 @@ class Boss {
         }
         if (this.rect.left <= 0 || this.rect.right >= WIDTH) this.speed_x *= -1;
       }
-    } else {
+    } else if (this.boss_type === 7) {
       // HYDRA: 緩やかに左右移動
       this.wave_angle += 0.04;
       this.rect.x += this.speed_x;
       if (this.rect.left <= 0 || this.rect.right >= WIDTH) this.speed_x *= -1;
       this.rect.top = 50;
+    } else {
+      // OMEGA: 中央付近を漂いつつ回転、時々テレポート
+      this.spin += 0.15;
+      this.bob_angle += 0.03;
+      this.rect.x += this.speed_x;
+      if (this.rect.left <= 0 || this.rect.right >= WIDTH) this.speed_x *= -1;
+      this.rect.centery = 110 + Math.trunc(Math.sin(this.bob_angle) * 40);
+      const warp_interval = hell_mode_active ? 3500 : 5000;
+      if (now - this.warp_timer > warp_interval) {
+        this.warp_timer = now;
+        this.rect.centerx = randint(Math.trunc(this.rect.width / 2), WIDTH - Math.trunc(this.rect.width / 2));
+      }
     }
 
     let shot_delay_b;
@@ -1345,6 +1370,36 @@ class Boss {
         const ax = dist !== 0 ? dx / dist : 0;
         const ay = dist !== 0 ? dy / dist : 1;
         addTo(boss_bullets, new BossBullet(cx, by, ax * (sp + 1.5), ay * (sp + 1.5), 0));
+      }
+    } else {
+      // OMEGA(隠しボス): 回転する全方位弾＋自機狙い。HPが減るとフェーズ強化
+      const cx = this.rect.centerx;
+      const by = this.rect.centery;
+      const sp = bullet_speed_y * 0.9;
+      const phase = this.hp > this.max_hp * 0.66 ? 1 : (this.hp > this.max_hp * 0.33 ? 2 : 3);
+      const arms = phase === 1 ? 6 : (phase === 2 ? 8 : 12);
+      for (let k = 0; k < arms; k++) {
+        const ang = this.spin + (Math.PI * 2 * k) / arms;
+        addTo(boss_bullets, new BossBullet(cx, by, Math.cos(ang) * sp, Math.sin(ang) * sp, 0));
+      }
+      // 自機狙い
+      const dx = player.rect.centerx - cx;
+      const dy = player.rect.centery - by;
+      const dist = hypot(dx, dy);
+      const ax = dist !== 0 ? dx / dist : 0;
+      const ay = dist !== 0 ? dy / dist : 1;
+      addTo(boss_bullets, new BossBullet(cx, by, ax * (sp + 1.5), ay * (sp + 1.5), 0));
+      if (phase >= 2) {
+        // 前方5way拡散
+        for (let s = -2; s <= 2; s++) addTo(boss_bullets, new BossBullet(cx, by, s * 1.8, sp, 0));
+      }
+      if (phase >= 3 || hell_mode_active) {
+        // 逆回転リング
+        const arms2 = 10;
+        for (let k = 0; k < arms2; k++) {
+          const ang = -this.spin + (Math.PI * 2 * k) / arms2 + 0.3;
+          addTo(boss_bullets, new BossBullet(cx, by, Math.cos(ang) * (sp + 1), Math.sin(ang) * (sp + 1), 0));
+        }
       }
     }
   }
@@ -1925,9 +1980,16 @@ function step() {
           addTo(items, new Item(bullet.rect.centerx, bullet.rect.centery, item_type));
         }
         if (boss.hp <= 0) {
-          for (let k = 0; k < 45; k++) particles.push(new Particle(boss.rect.centerx, boss.rect.centery, choice(["rgb(255,220,0)", "rgb(255,120,50)"])));
+          const wasSecret = boss.is_secret;
+          const bcx = boss.rect.centerx, bcy = boss.rect.centery;
+          for (let k = 0; k < (wasSecret ? 90 : 45); k++) particles.push(new Particle(bcx, bcy, choice(["rgb(255,220,0)", "rgb(255,120,50)"])));
           boss = null;
-          score += 10;
+          score += wasSecret ? 100 : 10;
+          if (wasSecret) {
+            // 隠しボス撃破ボーナス: アイテム多めドロップ
+            addTo(items, new Item(bcx, bcy, "heart"));
+            for (const t of ["orange", "yellow", "purple", "blue", "green"]) addTo(items, new Item(bcx + randint(-40, 40), bcy + randint(-20, 20), t));
+          }
           se_explosion.play();
           se_clear.play();
           stage_clear = true;
