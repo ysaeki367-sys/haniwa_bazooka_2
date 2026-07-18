@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>haniwa bazooka 2</title>
+<style>
+  @font-face {
+    font-family: 'PixelWarden';
+    src: url('fonts/PixelWarden.ttf') format('truetype');
+    font-display: swap;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #111;
+    height: 100%;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+  }
+  #game {
+    background: #000;
+    image-rendering: pixelated;
+    box-shadow: 0 0 24px rgba(0, 0, 0, 0.8);
+    outline: none;
+  }
+  /* ゲーム枠の外（ページ右上）に表示するリーダーボード */
+  #ranking {
+    position: fixed;
+    top: 20px;
+    right: 24px;
+    width: 310px;
+    color: #fff;
+    font-family: 'PixelWarden', monospace;
+    z-index: 10;
+    user-select: none;
+    border: 2px solid #cfd3da;
+    border-radius: 12px;
+    padding: 14px 18px 16px;
+    background: rgba(0, 0, 0, 0.82);
+    box-shadow: 0 0 18px rgba(0, 0, 0, 0.6);
+  }
+  #ranking h2 {
+    margin: 0 0 12px;
+    font-size: 24px;
+    color: #ffeb3b;
+    letter-spacing: 1px;
+    text-align: center;
+    text-shadow: 0 0 6px rgba(255, 200, 0, 0.35);
+  }
+  #ranking-body {
+    font-size: 18px;
+    line-height: 1.6;
+  }
+  .rk-row {
+    display: grid;
+    grid-template-columns: 34px 1fr auto 52px;
+    gap: 8px;
+    color: #c8c8c8;
+  }
+  .rk-score { text-align: right; }
+  .rk-stage { text-align: right; color: #8a8a8a; }
+  .rk-row.gold { color: #ffd700; }
+  .rk-row.silver { color: #d5e2ea; }
+  .rk-row.bronze { color: #d68c50; }
+  .rk-row.gold .rk-stage,
+  .rk-row.silver .rk-stage,
+  .rk-row.bronze .rk-stage { color: inherit; opacity: 0.85; }
+  .rk-empty { color: #969696; font-size: 16px; text-align: center; }
+  .rk-loading { color: #dddddd; font-size: 17px; text-align: center; padding: 6px 0; }
+  .rk-note {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #7a7a7a;
+    text-align: center;
+    letter-spacing: 0.5px;
+  }
+  @media (max-width: 920px) {
+    #ranking {
+      position: static;
+      width: 480px;
+      margin: 12px auto 0;
+    }
+    body { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+  <canvas id="game" width="480" height="640" tabindex="0"></canvas>
+  <div id="ranking">
+    <h2>LEADERBOARD</h2>
+    <div id="ranking-body"><div class="rk-loading">読み込み中...</div></div>
+  </div>
+  <script src="game.js"></script>
+</body>
+</html>
